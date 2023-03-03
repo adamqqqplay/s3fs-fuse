@@ -2712,6 +2712,8 @@ static int s3fs_open(const char* _path, struct fuse_file_info* fi)
         if(0 != (result = ent->RowFlush(autoent.GetPseudoFd(), path, AutoLock::NONE, true))){
             S3FS_PRN_ERR("could not upload file(%s): result=%d", path, result);
             StatCache::getStatCacheData()->DelStat(path);
+            struct timespec ts2 = {0, 0};
+            ent->SetMCtime(ts2, ts2);       // Modifies the timestamp to invalidate the cache after upload failed.
             return result;
         }
     }
