@@ -5142,8 +5142,31 @@ static int my_fuse_opt_proc(void* data, const char* arg, int key, struct fuse_ar
             max_dirty_data = size;
             return 0;
         }
+        if(is_prefix(arg, "free_space_ratio=")){
+            int ratio = static_cast<int>(cvt_strtoofft(strchr(arg, '=') + sizeof(char), /*base=*/ 10));
+
+            if(FdManager::GetEnsureFreeDiskSpace()!=0){
+                S3FS_PRN_EXIT("option free_space_ratio conflicts with ensure_diskfree, please set only one of them.");
+                return -1;
+            }
+
+            if(ratio < 0 || ratio > 100){
+                S3FS_PRN_EXIT("option free_space_ratio must between 0 to 100, which is: %d", ratio);
+                return -1;
+            } else {
+                FdManager::SetFreeSpaceRatio(ratio);
+                return 0;
+            }
+        }
         else if(is_prefix(arg, "ensure_diskfree=")){
             off_t dfsize = cvt_strtoofft(strchr(arg, '=') + sizeof(char), /*base=*/ 10) * 1024 * 1024;
+
+            if(FdManager::GetFreeSpaceRatio()!=0){
+                S3FS_PRN_EXIT("option free_space_ratio conflicts with ensure_diskfree, please set only one of them.");
+                return -1;
+            }
+
+            S3FS_PRN_INFO("Set up and ensure the free disk space is greater than %.3f MB.", static_cast<double>(dfsize) / 1024 / 1024);
             if(dfsize < S3fsCurl::GetMultipartSize()){
                 S3FS_PRN_WARN("specified size to ensure disk free space is smaller than multipart size, so set multipart size to it.");
                 dfsize = S3fsCurl::GetMultipartSize();
@@ -5698,6 +5721,19 @@ int main(int argc, char* argv[])
     // set fake free disk space
     if(-1 != fake_diskfree_size){
         FdManager::InitFakeUsedDiskSize(fake_diskfree_size);
+    }
+
+    // Make free_space_ratio to take effect
+    int free_space_ratio = FdManager::GetFreeSpaceRatio();
+    if(free_space_ratio!=0){
+        off_t dfsize = FdManager::GetTotalDiskSpaceByRatio(free_space_ratio);
+        S3FS_PRN_INFO("Free space ratio set to %d %%, ensure the available disk space is greater than %.3f MB", free_space_ratio, static_cast<double>(dfsize) / 1024 / 1024);
+
+        if(dfsize < S3fsCurl::GetMultipartSize()){
+            S3FS_PRN_WARN("specified size to ensure disk free space is smaller than multipart size, so set multipart size to it.");
+            dfsize = S3fsCurl::GetMultipartSize();
+        }
+        FdManager::SetEnsureFreeDiskSpace(dfsize);
     }
 
     // set user agent

@@ -36,6 +36,7 @@ class FdManager
       static bool            is_lock_init;
       static std::string     cache_dir;
       static bool            check_cache_dir_exist;
+      static int             free_space_ratio;      // Ensure the disk always has a certain percentage of space after using cache
       static off_t           free_disk_space;       // limit free disk space
       static off_t           fake_used_disk_space;  // difference between fake free disk space and actual at startup(for test/debug)
       static std::string     check_cache_output;
@@ -47,7 +48,9 @@ class FdManager
 
   private:
       static off_t GetFreeDiskSpace(const char* path);
+      static off_t GetTotalDiskSpace(const char* path);
       static bool IsDir(const std::string* dir);
+      static int GetVfsStat(const char* path, struct statvfs* vfsbuf);
 
       int GetPseudoFdCount(const char* path);
       void CleanupCacheDirInternal(const std::string &path = "");
@@ -85,6 +88,9 @@ class FdManager
       static bool SetTmpDir(const char* dir);
       static bool CheckTmpDirExist();
       static FILE* MakeTempFile();
+      static off_t GetTotalDiskSpaceByRatio(int ratio);
+      static int SetFreeSpaceRatio(int ratio);
+      static int GetFreeSpaceRatio();
 
       // Return FdEntity associated with path, returning nullptr on error.  This operation increments the reference count; callers must decrement via Close after use.
       FdEntity* GetFdEntity(const char* path, int& existfd, bool newfd = true, AutoLock::Type locktype = AutoLock::NONE);
